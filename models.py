@@ -8,8 +8,6 @@ from flask_sqlalchemy import SQLAlchemy
 bcrypt = Bcrypt()
 db = SQLAlchemy()
 
-
-
 class User(db.Model):
     """User for SharenBn"""
 
@@ -50,7 +48,7 @@ class User(db.Model):
     bookings = db.relationship('Booking', backref='customer')
 
     @classmethod
-    def signup(cls, username, email, password, image_url=DEFAULT_IMAGE_URL):
+    def signup(cls, username, email, password, first_name, last_name):
         """Sign up user.
 
         Hashes password and adds user to session.
@@ -62,7 +60,9 @@ class User(db.Model):
             username=username,
             email=email,
             password=hashed_pwd,
-            image_url=image_url,
+            first_name=first_name,
+            last_name=last_name,
+            owner=False
         )
 
         db.session.add(user)
@@ -88,6 +88,8 @@ class User(db.Model):
                 return user
 
         return False
+
+
 
 class Property(db.Model):
     """Property in the system."""
@@ -119,26 +121,26 @@ class Property(db.Model):
         secondary='bookings',
         backref='booked_properties',
     )
-
     bookings = db.relationship('Booking', backref='property')
+    amenities = db.relationship('Amenity', secondary='properties_amenities' backref='property')
 
-    def __repr__(self):
-        return f"<User #{self.id}: {self.username}, {self.email}>"
+    @classmethod
+    def add_property(cls, address, price_rate, owner, sqft):
+        """Creates property listing.
 
+        Adds property to database
+        """
 
-    def is_followed_by(self, other_user):
-        """Is this user followed by `other_user`?"""
+        location = Property(
+            address=address,
+            price_rate=price_rate,
+            owner=owner,
+            sqft=sqft
+        )
 
-        found_user_list = [
-            user for user in self.followers if user == other_user]
-        return len(found_user_list) == 1
+        db.session.add(location)
+        return location
 
-    def is_following(self, other_user):
-        """Is this user following `other_use`?"""
-
-        found_user_list = [
-            user for user in self.following if user == other_user]
-        return len(found_user_list) == 1
 
 
 class Booking(db.Model):
@@ -212,6 +214,19 @@ class Property_Amenity(db.Model):
     )
 
     __table_args__ = (db.PrimaryKeyConstraint(feature, address))
+
+    @classmethod
+    def add_property_amenity(cls, feature, address):
+        """Adds a property-amenity relationship to table.
+
+        """
+
+        property_amenity = Property_Amenity(
+            feature=feature,
+            address=address
+        )
+
+        db.session.add(property_amenity)
 
 
 def connect_db(app):
