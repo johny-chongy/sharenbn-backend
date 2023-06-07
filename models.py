@@ -51,8 +51,29 @@ class User(db.Model):
         unique=True,
     )
 
-    properties = db.relationship('Property', backref='owner')
-    bookings = db.relationship('Booking', backref='customer')
+    properties = db.relationship(
+        'Property',
+        backref='owner',
+        cascade='all, delete-orphan'
+    )
+
+    bookings = db.relationship(
+        'Booking',
+        backref='customer',
+        cascade='all, delete-orphan'
+    )
+
+    def serialize(self):
+        """Serialize to dictionary."""
+
+        return {
+            "username": self.username,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "email": self.email,
+            "properties": [p.serialize() for p in self.properties],
+            "bookings": [b.serialize() for b in self.bookings]
+        }
 
     @classmethod
     def signup(cls, username, email, password, first_name, last_name):
@@ -68,11 +89,11 @@ class User(db.Model):
             email=email,
             password=hashed_pwd,
             first_name=first_name,
-            last_name=last_name,
-            owner=False
+            last_name=last_name
         )
 
         db.session.add(user)
+        db.session.commit()
         return user
 
     @classmethod
@@ -145,10 +166,18 @@ class Property(db.Model):
         backref='booked_properties',
     )
 
+    bookings = db.relationship(
+        'Booking',
+        backref='property',
+        cascade='all, delete-orphan'
+    )
+
+
     def serialize(self):
         """Serialize to dictionary."""
 
         return {
+            "id":self.id,
             "address": self.address,
             "price_rate": self.price_rate,
             "owner": self.user,
@@ -187,6 +216,7 @@ class Booking(db.Model):
     id = db.Column(
         db.Integer,
         primary_key=True,
+        autoincrement=True
     )
 
     address = db.Column(
@@ -214,14 +244,44 @@ class Booking(db.Model):
         nullable=False
     )
 
-    review = db.Column(
-        db.String
-    )
+    # review = db.Column(
+    #     db.String
+    # )
 
-    rating = db.Column(
-        db.Integer
-    )
+    # rating = db.Column(
+    #     db.Integer
+    # )
 
-    property = db.relationship('Property', backref='bookings')
+    def serialize(self):
+        """Serialize to dictionary."""
+
+        return {
+            "id":self.id,
+            "address":self.address,
+            "customer": self.username,
+            "total_price": self.total_price,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+        }
+
+    @classmethod
+    def add_booking(cls, address, username, total_price, start_date, end_date):
+        """Creates property listing.
+
+        Adds property to database
+        """
+
+        booking = Booking(
+            address=address,
+            username=username,
+            total_price=total_price,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        db.session.add(booking)
+        db.session.commit()
+        return booking
+
 
 
