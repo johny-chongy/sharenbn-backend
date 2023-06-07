@@ -6,16 +6,7 @@ from models import db, connect_db, User, Message, Like
 
 auth = Blueprint('auth', __name__)
 
-jwt = JWT(app, authenticate, identity)
 
-def authenticate(username, password):
-    user = db.query.get_or_404(username)
-    if user and password == user.password:
-        return user
-
-def identity(payload):
-    user_id = payload['identity']
-    return User.get_by_id(user_id)
 
 @auth.post("/")
 @expects_json(user_registration_schema)

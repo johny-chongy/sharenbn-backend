@@ -122,7 +122,6 @@ class Property(db.Model):
         backref='booked_properties',
     )
     bookings = db.relationship('Booking', backref='property')
-    amenities = db.relationship('Amenity', secondary='properties_amenities' backref='property')
 
     @classmethod
     def add_property(cls, address, price_rate, owner, sqft):
@@ -140,7 +139,6 @@ class Property(db.Model):
 
         db.session.add(location)
         return location
-
 
 
 class Booking(db.Model):
@@ -185,48 +183,6 @@ class Booking(db.Model):
     rating = db.Column(
         db.Integer
     )
-
-
-class Amenity(db.Model):
-    """Amenities for a property"""
-
-    __tablename__ = 'amenities'
-
-    feature = db.Column(
-        db.String(30),
-        primary_key=True,
-    )
-
-
-class Property_Amenity(db.Model):
-    """Amenities mapped to a property"""
-
-    __tablename__ = 'properties_amenities'
-
-    feature = db.Column(
-        db.String(30),
-        db.ForeignKey('Amenity.feature', ondelete='CASCADE')
-    )
-
-    address = db.Column(
-        db.String,
-        db.ForeignKey('Property.address', ondelete='CASCADE')
-    )
-
-    __table_args__ = (db.PrimaryKeyConstraint(feature, address))
-
-    @classmethod
-    def add_property_amenity(cls, feature, address):
-        """Adds a property-amenity relationship to table.
-
-        """
-
-        property_amenity = Property_Amenity(
-            feature=feature,
-            address=address
-        )
-
-        db.session.add(property_amenity)
 
 
 def connect_db(app):
