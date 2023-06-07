@@ -2,8 +2,10 @@ import os
 import boto3
 import botocore
 from dotenv import load_dotenv
+import json
 
 from flask import Flask, request, session, g, jsonify
+
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 # from flask_jwt import JWT, jwt_required,jwt_encode_handler, current_identity
@@ -87,28 +89,35 @@ def add_property():
     Return success confirmation message
     """
 
-    img_file = request.files['img_file']
+    json_data = request.form.get('json_data')
+    parsed_json_data = json.loads(json_data)
+    img_file = request.files['file']
     img_file_name = Aws.upload_file(img_file)
 
     img_url = Aws.get_file_url(img_file_name)
-    address = request.json['address']
-    sqft = request.json['sqft']
-    amenities = request.json['amenities']
-    description = request.json['description']
-    owner = request.json['owner']
-    rate = request.json['rate']
+    address = parsed_json_data['address']
+    sqft = parsed_json_data['sqft']
+    # amenities = parsed_json_data['amenities']
+    # description = parsed_json_data['description']
+    owner = parsed_json_data['owner']
+    price_rate = parsed_json_data['price_rate']
+    # breakpoint()
+    # new_property = Property(
+    #     address=address,
+    #     sqft=sqft,
+    #     owner=owner,
+    #     price_rate=price_rate,
+    #     img_url=img_url
+    # )
 
-    new_property = Property(
+    # db.session.add(new_property)
+    Property.add_property(
         address=address,
         sqft=sqft,
-        amenities=amenities,
-        description=description,
         owner=owner,
-        rate=rate,
-        img_url=img_url
+        price_rate=price_rate
     )
 
-    db.session.add(new_property)
     db.session.commit()
 
 

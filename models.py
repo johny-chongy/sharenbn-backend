@@ -118,7 +118,7 @@ class Property(db.Model):
         nullable=False,
     )
 
-    owner = db.Column(
+    user = db.Column(
         db.String(30),
         db.ForeignKey('users.username', ondelete='CASCADE')
     )
@@ -128,18 +128,16 @@ class Property(db.Model):
         nullable=False
     )
 
-    img_url = db.Column(
-        db.String,
-        nullable=False
-    )
+    # img_url = db.Column(
+    #     db.String,
+    #     nullable=False
+    # )
 
     customers = db.relationship(
         'User',
         secondary='bookings',
         backref='booked_properties',
     )
-
-    bookings = db.relationship('Booking', backref='property')
 
     @classmethod
     def add_property(cls, address, price_rate, owner, sqft):
@@ -174,7 +172,7 @@ class Booking(db.Model):
         db.ForeignKey('properties.address', ondelete='CASCADE')
     )
 
-    customer = db.Column(
+    username = db.Column(
         db.String(30),
         db.ForeignKey('users.username', ondelete='CASCADE')
     )
@@ -201,5 +199,7 @@ class Booking(db.Model):
     rating = db.Column(
         db.Integer
     )
+
+    property = db.relationship('Property', backref='bookings')
 
 

@@ -9,6 +9,7 @@ AWS_ACCESS_KEY = os.environ['AWS_ACCESS_KEY']
 AWS_SECRET_ACCESS_KEY = os.environ['AWS_SECRET_ACCESS_KEY']
 AWS_BUCKET_NAME = os.environ['AWS_BUCKET_NAME']
 
+
 # Initialize AWS S3 client
 s3 = boto3.client('s3',
                   aws_access_key_id=AWS_ACCESS_KEY,
