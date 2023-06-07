@@ -17,8 +17,7 @@ test_user1 = User(
     first_name='testy',
     last_name='zesty',
     email='testy@zesty.com',
-    password=hashed_test_pswd,
-    owner=False
+    password=hashed_test_pswd
 )
 
 db.session.add(test_user1)

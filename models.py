@@ -51,11 +51,6 @@ class User(db.Model):
         unique=True,
     )
 
-    owner = db.Column(
-        db.Boolean,
-        default=False
-    )
-
     properties = db.relationship('Property', backref='owner')
     bookings = db.relationship('Booking', backref='customer')
 
@@ -108,9 +103,15 @@ class Property(db.Model):
 
     __tablename__ = 'properties'
 
+    id = db.Column(
+        db.Integer,
+        primary_key=True,
+        autoincrement=True
+    )
+
     address = db.Column(
         db.String,
-        primary_key=True,
+        unique=True
     )
 
     price_rate = db.Column(
@@ -128,10 +129,15 @@ class Property(db.Model):
         nullable=False
     )
 
-    # img_url = db.Column(
-    #     db.String,
-    #     nullable=False
-    # )
+    img_url = db.Column(
+        db.String,
+        nullable=False
+    )
+
+    description =db.Column(
+        db.String,
+        default=""
+    )
 
     customers = db.relationship(
         'User',
@@ -139,8 +145,20 @@ class Property(db.Model):
         backref='booked_properties',
     )
 
+    def serialize(self):
+        """Serialize to dictionary."""
+
+        return {
+            "address": self.address,
+            "price_rate": self.price_rate,
+            "owner": self.user,
+            "sqft": self.sqft,
+            "img_url": self.img_url,
+            "description":self.description
+        }
+
     @classmethod
-    def add_property(cls, address, price_rate, owner, sqft):
+    def add_property(cls, address, price_rate, owner, sqft, img_url,description):
         """Creates property listing.
 
         Adds property to database
@@ -150,11 +168,15 @@ class Property(db.Model):
             address=address,
             price_rate=price_rate,
             owner=owner,
-            sqft=sqft
+            sqft=sqft,
+            img_url=img_url,
+            description=description
         )
 
         db.session.add(location)
+        db.session.commit()
         return location
+
 
 
 class Booking(db.Model):

@@ -25,7 +25,8 @@ app = Flask(__name__)
 # app.register_blueprint(users)
 # app.register_blueprint(auth)
 
-app.config['SQLALCHEMY_ECHO'] = False
+app.config['SQLALCHEMY_ECHO'] = True
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
@@ -79,73 +80,106 @@ def register_user():
 
     return jsonify({'message': 'Invalid credentials'}), 401
 
-## PROPERTY ##
+
+## PROPERTY ROUTES ##
 @app.post("/property")
 def add_property():
-    """Handle new property registration.
+    """Handles POST request for new property registration.
 
     Create new property and add to DB & upload files to S3
 
-    Return success confirmation message
+    Return JSON for newly created property
     """
 
-    json_data = request.form.get('json_data')
-    parsed_json_data = json.loads(json_data)
+    address = request.form.get('address')
+    sqft = request.form.get('sqft')
+    description = request.form.get('description')
+    owner = User.query.get_or_404(request.form.get('owner'))
+    price_rate = request.form.get('price_rate')
+
     img_file = request.files['file']
     img_file_name = Aws.upload_file(img_file)
-
     img_url = Aws.get_file_url(img_file_name)
-    address = parsed_json_data['address']
-    sqft = parsed_json_data['sqft']
-    # amenities = parsed_json_data['amenities']
-    # description = parsed_json_data['description']
-    owner = parsed_json_data['owner']
-    price_rate = parsed_json_data['price_rate']
-    # breakpoint()
-    # new_property = Property(
-    #     address=address,
-    #     sqft=sqft,
-    #     owner=owner,
-    #     price_rate=price_rate,
-    #     img_url=img_url
-    # )
 
-    # db.session.add(new_property)
-    Property.add_property(
-        address=address,
-        sqft=sqft,
-        owner=owner,
-        price_rate=price_rate
-    )
+    try:
+        property = Property.add_property(address,
+                                         price_rate,
+                                         owner,
+                                         sqft,
+                                         img_url,
+                                         description)
+        return (jsonify(property=property.serialize()), 201)
 
-    db.session.commit()
-
-
-    return "property upload successful"
+    except IntegrityError:
+        error = f"Property address ({address}) already listed"
+        return jsonify(error=error)
 
 
 @app.get("/property")
-def get_property():
-    try:
+def get_all_properties():
+    """handles GET request to read all properties
 
-        file_name=request.json['img_name']
-        # Generate a pre-signed URL for the file
-        url = s3.generate_presigned_url('get_object',
-                                        Params={'Bucket': AWS_BUCKET_NAME,
-                                                'Key': file_name},
-                                        ExpiresIn=3600)  # URL expiration time in seconds
+    Return JSON array for all properties
+    """
 
-        # Return the URL as a JSON response
-        return jsonify({'url': url})
-    except botocore.exceptions.NoCredentialsError:
-        return 'Error: AWS credentials not found.', 500
-    except botocore.exceptions.ParamValidationError:
-        return 'Error: Invalid bucket or file name.', 400
-    except botocore.exceptions.ClientError as e:
-        if e.response['Error']['Code'] == 'NoSuchKey':
-            return 'Error: File not found.', 404
-        else:
-            return 'Error: Failed to retrieve file URL.', 500
+    properties = Property.query.all()
+    serialized_properties = [p.serialize() for p in properties]
+
+    return (jsonify(properties=serialized_properties), 200)
+
+
+@app.get("/property/<int:property_id>")
+def get_property(property_id):
+    """handles GET request to read specific property based on id
+
+    Return JSON for searched property
+    """
+
+    property = Property.query.get_or_404(property_id)
+    return (jsonify(property=property.serialize()), 200)
+
+
+@app.patch("/property/<int:property_id>")
+def edit_property(property_id):
+    """handles PATCH request to edit specific property based on id
+
+    Return JSON for newly updated property
+    """
+
+    property = Property.query.get_or_404(property_id)
+
+    property.address = request.form.get('address', property.address)
+    property.sqft = request.form.get('sqft', property.sqft)
+    property.price_rate = request.form.get('price_rate', property.price_rate)
+    property.description = request.form.get('description', property.description)
+
+    img_file = request.files.get('file')
+
+    if img_file:
+        img_file_name = Aws.upload_file(img_file)
+        property.img_url = Aws.get_file_url(img_file_name)
+
+    db.session.commit()
+
+    serialized_updated_property = property.serialize()
+
+    return jsonify(property=serialized_updated_property)
+
+
+@app.delete("/property/<int:property_id>")
+def delete_property(property_id):
+    """handles DELETE request to delete specific property based on id
+
+    Return JSON for confirmation message
+    """
+
+    property = Property.query.get_or_404(property_id)
+
+    db.session.delete(property)
+    db.session.commit()
+
+    return jsonify(deleted = property.address)
+
 
 
 
