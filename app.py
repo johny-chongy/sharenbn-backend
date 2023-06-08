@@ -23,6 +23,7 @@ from aws_s3 import Aws, AWS_ACCESS_KEY, AWS_BUCKET_NAME, AWS_SECRET_ACCESS_KEY
 # from user_blueprint import users
 # from auth_blueprint import auth
 
+TIME_FORMAT = "%m/%d/%Y"
 s3 = boto3.resource("s3")
 
 load_dotenv()
@@ -64,8 +65,9 @@ def identity(payload):
 # jwt = JWT(app, authenticate, identity)
 jwt = JWTManager(app)
 
+
 ############################# USERS ############################
-@app.post("/user")
+@app.post("/auth/signup")
 # @expects_json(user_registration_schema)
 def register_user():
     """Handle user signup.
@@ -95,6 +97,24 @@ def register_user():
 
     return jsonify({"message": "Invalid credentials"}), 401
 
+@app.post("/auth/login")
+def login_user():
+    """Handle user login.
+    Return JSON of JWT.
+    If Login with invalid credentials, return JSON: invalid.
+    """
+    username = request.form.get("username")
+    password = request.form.get("password")
+
+    user = User.authenticate(username, password)
+
+    if user:
+        access_token = create_access_token(identity=user.username, expires_delta=False)
+        return jsonify(access_token=access_token)
+
+    return jsonify({"message": "Invalid credentials"}), 401
+
+
 
 @app.get("/user/<username>")
 @jwt_required()
@@ -113,9 +133,9 @@ def update_user(username):
     """Given a username and formData
     Return JSON with updated user info
     """
-    jwt_user = get_jwt_identity()
+    current_user = get_jwt_identity()
 
-    if jwt_user != username:
+    if current_user != username:
         return jsonify(error="Invalid Authorization")
 
     user = User.query.get_or_404(username)
@@ -137,9 +157,9 @@ def delete_user(username):
     Return JSON with delete confirmation
     """
 
-    jwt_user = get_jwt_identity()
+    current_user = get_jwt_identity()
 
-    if jwt_user != username:
+    if current_user != username:
         return jsonify(error="Invalid Authorization")
 
     user = User.query.get_or_404(username)
@@ -218,9 +238,9 @@ def edit_property(property_id):
 
     property = Property.query.get_or_404(property_id)
 
-    jwt_user = get_jwt_identity()
+    current_user = get_jwt_identity()
 
-    if jwt_user != property.owner.username:
+    if current_user != property.owner.username:
         return jsonify(error="Invalid Authorization")
 
     property.address = request.form.get("address", property.address)
@@ -253,9 +273,9 @@ def delete_property(property_id):
 
     property = Property.query.get_or_404(property_id)
 
-    jwt_user = get_jwt_identity()
+    current_user = get_jwt_identity()
 
-    if jwt_user != property.owner.username:
+    if current_user != property.owner.username:
         return jsonify(error="Invalid Authorization")
 
     db.session.delete(property)
@@ -273,20 +293,24 @@ def book_property(property_id):
     return JSON with booking info
     """
     property = Property.query.get_or_404(property_id)
-    start_date_str = request.form.get('start_date')
-    end_date_str = request.form.get('end_date')
+    start_date_str = request.form.get("start_date")
+    end_date_str = request.form.get("end_date")
 
-    start_date = datetime.strptime(start_date_str, "%m/%d/%Y")
-    end_date = datetime.strptime(end_date_str, "%m/%d/%Y")
+    start_date = datetime.strptime(start_date_str, TIME_FORMAT)
+    end_date = datetime.strptime(end_date_str, TIME_FORMAT)
     total_price = (end_date - start_date).days * property.price_rate
-    jwt_user = get_jwt_identity()
+    current_user = get_jwt_identity()
 
-    if jwt_user == property.owner.username:
+    if current_user == property.owner.username:
         return jsonify(error="Owner cannot book own property")
 
-    valid_dates = all(((start_date < b.start_date and end_date <b.start_date) or
-                       (start_date > b.end_date and end_date > b.end_date))
-                       for b in property.bookings)
+    valid_dates = all(
+        (
+            (start_date < b.start_date and end_date < b.start_date)
+            or (start_date > b.end_date and end_date > b.end_date)
+        )
+        for b in property.bookings
+    )
 
     if not valid_dates:
         return jsonify(error="dates already booked")
@@ -294,15 +318,16 @@ def book_property(property_id):
     try:
         booking = Booking.add_booking(
             address=property.address,
-            username=jwt_user,
+            username=current_user,
             total_price=total_price,
             start_date=start_date,
-            end_date=end_date
-            )
+            end_date=end_date,
+        )
 
         return jsonify(booking=booking.serialize())
     except ValueError:
         return jsonify(error="start date is after end date")
+
 
 @app.get("/property/<int:property_id>/bookings")
 @jwt_required()
@@ -311,7 +336,87 @@ def get_property_bookings(property_id):
     Return JSON of all the property bookings
     """
     property = Property.query.get_or_404(property_id)
+
+    if get_jwt_identity() != property.owner.username:
+        return jsonify(error="Invalid Authorization")
+
     return jsonify(bookings=[b.serialize() for b in property.bookings])
 
+@app.get("/user/<username>/bookings")
+@jwt_required()
+def get_user_bookings(username):
+    """Given a username
+    Return JSON of all the bookings for that user
+    """
+    user = User.query.get_or_404(username)
 
-#TODO: Bookings: PATCH, DELETE, GET (specific) | User: Login (retrieve token with right user / pswd) | blueprints ?
+    if get_jwt_identity() != username:
+        return jsonify(error="Invalid Authorization")
+
+    return jsonify(bookings=[b.serialize() for b in user.bookings])
+
+@app.get("/bookings/<int:booking_id>")
+@jwt_required()
+def get_booking(booking_id):
+    """Given a booking id
+    Return JSON of the bookings
+    """
+    current_user = get_jwt_identity()
+    booking = Booking.query.get_or_404(booking_id)
+    property = Property.query.filter_by(address=booking.address)
+
+    if (current_user != booking.username) or (property.owner.username != current_user):
+        return jsonify(error="Invalid Authorization")
+
+    return jsonify(booking=booking.serialize())
+
+@app.patch("/bookings/<int:booking_id>")
+@jwt_required()
+def update_booking(booking_id):
+    """Given a property id
+    Update the booking in the database
+    Return JSON of all the updated property booking
+    """
+    booking = Booking.query.get_or_404(booking_id)
+    property = Property.query.filter_by(address=booking.address)
+
+    start_date_str = request.form.get("start_date", datetime.strftime(booking.start_date, TIME_FORMAT))
+    end_date_str = request.form.get("end_date", datetime.strftime(booking.end_date, TIME_FORMAT))
+
+    booking.start_date = datetime.strptime(start_date_str, TIME_FORMAT)
+    booking.end_date = datetime.strptime(end_date_str, TIME_FORMAT)
+    booking.total_price = (booking.end_date - booking.start_date).days * property.price_rate
+    current_user = get_jwt_identity()
+
+    if current_user == property.owner.username:
+        return jsonify(error="Owner cannot book own property")
+
+    valid_dates = all(
+        (
+            (booking.start_date < b.start_date and booking.end_date < b.start_date)
+            or (booking.start_date > b.end_date and booking.end_date > b.end_date)
+        )
+        for b in property.bookings
+    )
+
+    if not valid_dates:
+        return jsonify(error="dates already booked")
+
+    try:
+        db.session.commit()
+        return jsonify(booking=booking.serialize())
+    except ValueError:
+        return jsonify(error="start date is after end date")
+
+@app.delete("/bookings/<int:booking_id>")
+@jwt_required()
+def delete_booking(booking_id):
+    booking = Booking.query.get_or_404(booking_id)
+
+    db.session.delete(booking)
+    db.session.commit()
+
+    return jsonify(deleted=f"Booking at {booking.address} deleted")
+
+
+# TODO: Bookings: PATCH, DELETE, GET (specific) | User: Login (retrieve token with right user / pswd) | blueprints ?
