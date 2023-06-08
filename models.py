@@ -264,15 +264,37 @@ class Booking(db.Model):
             "end_date": self.end_date,
         }
 
+
+    @classmethod
+    def verify_dates(cls, start_date, end_date, property_id, booking_id=None):
+        """Verifies:
+                -start_date < end_date
+                -dates do not coincide with any other booking dates
+        """
+        if (start_date > end_date):
+            raise ValueError()
+
+        property_bookings = Property.query.get_or_404(property_id).bookings
+        filtered_bookings = [b_filter for b_filter in property_bookings
+                             if b_filter.id != booking_id]
+
+        dates_validated = all(
+                ((start_date < b.start_date and end_date < b.start_date)
+            or (start_date > b.end_date and end_date > b.end_date))
+                for b in filtered_bookings
+                )
+
+        if (not dates_validated):
+            raise MemoryError()
+
+        return dates_validated
+
     @classmethod
     def add_booking(cls, address, username, total_price, start_date, end_date):
         """Creates property listing.
 
         Adds property to database
         """
-        if (start_date > end_date):
-            raise ValueError()
-
         booking = Booking(
             address=address,
             username=username,
