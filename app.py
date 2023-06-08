@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import json
 
 from flask import Flask, request, session, g, jsonify
-
+from datetime import datetime
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError, PendingRollbackError
 
@@ -272,20 +272,46 @@ def book_property(property_id):
     Create a booking in the DB
     return JSON with booking info
     """
-    start_date = request.form.get('start_date')
-    end_date = request.form.get('end_date')
-    total_days =
-
     property = Property.query.get_or_404(property_id)
-    booking = Booking.add_booking(
-        address=property.address,
-        )
-    return jsonify(booking=booking)
+    start_date_str = request.form.get('start_date')
+    end_date_str = request.form.get('end_date')
+
+    start_date = datetime.strptime(start_date_str, "%m/%d/%Y")
+    end_date = datetime.strptime(end_date_str, "%m/%d/%Y")
+    total_price = (end_date - start_date).days * property.price_rate
+    jwt_user = get_jwt_identity()
+
+    if jwt_user == property.owner.username:
+        return jsonify(error="Owner cannot book own property")
+
+    valid_dates = all(((start_date < b.start_date and end_date <b.start_date) or
+                       (start_date > b.end_date and end_date > b.end_date))
+                       for b in property.bookings)
+
+    if not valid_dates:
+        return jsonify(error="dates already booked")
+
+    try:
+        booking = Booking.add_booking(
+            address=property.address,
+            username=jwt_user,
+            total_price=total_price,
+            start_date=start_date,
+            end_date=end_date
+            )
+
+        return jsonify(booking=booking.serialize())
+    except ValueError:
+        return jsonify(error="start date is after end date")
 
 @app.get("/property/<int:property_id>/bookings")
+@jwt_required()
 def get_property_bookings(property_id):
     """Given a property id
     Return JSON of all the property bookings
     """
     property = Property.query.get_or_404(property_id)
     return jsonify(bookings=[b.serialize() for b in property.bookings])
+
+
+#TODO: Bookings: PATCH, DELETE, GET (specific) | User: Login (retrieve token with right user / pswd) | blueprints ?

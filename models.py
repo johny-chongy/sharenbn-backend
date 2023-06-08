@@ -270,6 +270,8 @@ class Booking(db.Model):
 
         Adds property to database
         """
+        if (start_date > end_date):
+            raise ValueError()
 
         booking = Booking(
             address=address,
