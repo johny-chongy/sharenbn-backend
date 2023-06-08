@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from models import db, connect_db, User, Property, Booking
 from aws_s3 import Aws, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY
+from flask_cors import CORS
 from flask_jwt_extended import (
     create_access_token,
     get_jwt_identity,
@@ -18,6 +19,7 @@ s3 = boto3.resource("s3")
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 app.config["SQLALCHEMY_ECHO"] = True
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False

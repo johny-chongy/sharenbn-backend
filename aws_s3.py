@@ -42,5 +42,5 @@ class Aws():
     @classmethod
     def upload_file(cls, file):
         file_name = file.filename
-        s3.upload_fileobj(file, AWS_BUCKET_NAME, file_name)
+        s3.upload_fileobj(file, AWS_BUCKET_NAME, file_name,ExtraArgs={'ContentType': "image/jpeg"})
         return file_name
