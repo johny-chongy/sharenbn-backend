@@ -19,7 +19,7 @@ s3 = boto3.resource("s3")
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 app.config["SQLALCHEMY_ECHO"] = True
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
