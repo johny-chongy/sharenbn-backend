@@ -304,9 +304,11 @@ def book_property(property_id):
 
         return jsonify(booking=booking.serialize())
     except ValueError:
-        return jsonify(error="start date is after end date")
+        return 'Error: Start date is after end date.', 500
+        # return jsonify(error="start date is after end date")
     except MemoryError:
-        return jsonify(error="dates are already booked")
+        return 'Error: Dates are already booked.', 500
+        # return jsonify(error="dates are already booked")
 
 
 @app.get("/property/<int:property_id>/bookings")
@@ -388,9 +390,11 @@ def update_booking(booking_id):
         db.session.commit()
         return jsonify(booking=booking.serialize())
     except ValueError:
-        return jsonify(error="start date is after end date")
+        return 'Error: Start date is after end date.', 500
+        # return jsonify(error="start date is after end date")
     except MemoryError:
-        return jsonify(error="dates are already booked")
+        return 'Error: Dates are already booked.', 500
+        # return jsonify(error="dates are already booked")
 
 
 @app.delete("/bookings/<int:booking_id>")
