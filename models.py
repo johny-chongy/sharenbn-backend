@@ -262,6 +262,7 @@ class Booking(db.Model):
             "total_price": self.total_price,
             "start_date": self.start_date,
             "end_date": self.end_date,
+            "property": self.property.serialize()
         }
 
 
