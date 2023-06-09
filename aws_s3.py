@@ -24,8 +24,7 @@ class Aws():
             # Generate a pre-signed URL for the file
             url = s3.generate_presigned_url('get_object',
                                             Params={'Bucket': AWS_BUCKET_NAME,
-                                                    'Key': file_name},
-                                            ExpiresIn=3600)  # URL expiration time in seconds
+                                                    'Key': file_name})  # URL expiration time in seconds
 
             # Return the URL as a JSON response
             return url
