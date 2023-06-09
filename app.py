@@ -117,7 +117,7 @@ def update_user(username):
     current_user = get_jwt_identity()
 
     if current_user != username:
-        return jsonify(error="Invalid Authorization")
+        return jsonify({"error": "Invalid Authorization"})
 
     user = User.query.get_or_404(username)
 
@@ -141,7 +141,7 @@ def delete_user(username):
     current_user = get_jwt_identity()
 
     if current_user != username:
-        return jsonify(error="Invalid Authorization")
+        return jsonify({"error": "Invalid Authorization"})
 
     user = User.query.get_or_404(username)
 
@@ -182,7 +182,7 @@ def add_property():
 
     except IntegrityError:
         error = f"Property address ({address}) already listed"
-        return jsonify(error=error)
+        return jsonify({"error": error})
 
 
 @app.get("/property")
@@ -242,7 +242,7 @@ def edit_property(property_id):
         return jsonify(property=serialized_updated_property)
     except IntegrityError:
         db.session.rollback()
-        return jsonify(error=f"Duplicate address: {property.address}")
+        return jsonify({"error": f"Duplicate address: {property.address}"})
 
 
 @app.delete("/property/<int:property_id>")
@@ -258,7 +258,7 @@ def delete_property(property_id):
     current_user = get_jwt_identity()
 
     if current_user != property.owner.username:
-        return jsonify(error="Invalid Authorization")
+        return jsonify({"error": "Invalid Authorization"})
 
     db.session.delete(property)
     db.session.commit()
@@ -287,7 +287,7 @@ def book_property(property_id):
     current_user = get_jwt_identity()
 
     if current_user == property.owner.username:
-        return jsonify(error="Owner cannot book own property")
+        return jsonify({"error": "Owner cannot book own property"})
 
     try:
         Booking.verify_dates(start_date=start_date,
@@ -304,10 +304,10 @@ def book_property(property_id):
 
         return jsonify(booking=booking.serialize())
     except ValueError:
-        return 'Error: Start date is after end date.', 500
+        return jsonify({"error":'Start date is after end date.'}), 500
         # return jsonify(error="start date is after end date")
     except MemoryError:
-        return 'Error: Dates are already booked.', 500
+        return jsonify({"error":'Dates are already booked.'}), 500
         # return jsonify(error="dates are already booked")
 
 
@@ -320,7 +320,7 @@ def get_property_bookings(property_id):
     property = Property.query.get_or_404(property_id)
 
     if get_jwt_identity() != property.owner.username:
-        return jsonify(error="Invalid Authorization")
+        return jsonify({"error": "Invalid Authorization"})
 
     return jsonify(bookings=[b.serialize() for b in property.bookings])
 
@@ -334,7 +334,7 @@ def get_user_bookings(username):
     user = User.query.get_or_404(username)
 
     if get_jwt_identity() != username:
-        return jsonify(error="Invalid Authorization")
+        return jsonify({"error": "Invalid Authorization"})
 
     return jsonify(bookings=[b.serialize() for b in user.bookings])
 
@@ -350,7 +350,7 @@ def get_booking(booking_id):
     property = Property.query.filter_by(address=booking.address).first()
 
     if (current_user != booking.username) and (property.owner.username != current_user):
-        return jsonify(error="Invalid Authorization")
+        return jsonify({"error": "Invalid Authorization"})
 
     return jsonify(booking=booking.serialize())
 
@@ -379,7 +379,7 @@ def update_booking(booking_id):
     current_user = get_jwt_identity()
 
     if current_user != booking.customer.username:
-        return jsonify(error="Invalid authorization")
+        return jsonify({"error": "Invalid Authorization"})
 
     try:
         Booking.verify_dates(start_date=booking.start_date,
@@ -390,10 +390,10 @@ def update_booking(booking_id):
         db.session.commit()
         return jsonify(booking=booking.serialize())
     except ValueError:
-        return 'Error: Start date is after end date.', 500
+        return jsonify({"error":'Start date is after end date.'}), 500
         # return jsonify(error="start date is after end date")
     except MemoryError:
-        return 'Error: Dates are already booked.', 500
+        return jsonify({"error":'Dates are already booked.'}), 500
         # return jsonify(error="dates are already booked")
 
 
