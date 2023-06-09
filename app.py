@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from models import db, connect_db, User, Property, Booking
 from aws_s3 import Aws, AWS_ACCESS_KEY, AWS_SECRET_ACCESS_KEY
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask_jwt_extended import (
     create_access_token,
     get_jwt_identity,
@@ -19,13 +19,14 @@ s3 = boto3.resource("s3")
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 
 app.config["SQLALCHEMY_ECHO"] = True
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["DEBUG_TB_INTERCEPT_REDIRECTS"] = False
 app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ["DATABASE_URL"]
+app.config["CORS_HEADERS"] = "Content-Type"
 
 # Initialize AWS S3 client
 s3 = boto3.client(
@@ -36,7 +37,7 @@ s3 = boto3.client(
 
 connect_db(app)
 jwt = JWTManager(app)
-TIME_FORMAT = "%m/%d/%Y"
+TIME_FORMAT = "%Y-%m-%d"
 
 
 ############################# AUTH ############################
@@ -73,6 +74,7 @@ def register_user():
 
     return jsonify({"error": "Invalid credentials"}), 401
 
+
 @app.post("/auth/login")
 def login_user():
     """Handle user login.
@@ -105,6 +107,7 @@ def show_user(username):
     user = User.query.get_or_404(username)
     return jsonify(user=user.serialize())
 
+
 @app.patch("/user/<username>")
 @jwt_required()
 def update_user(username):
@@ -125,6 +128,7 @@ def update_user(username):
     db.session.commit()
 
     return jsonify(user=user.serialize())
+
 
 @app.delete("/user/<username>")
 @jwt_required()
@@ -180,6 +184,7 @@ def add_property():
         error = f"Property address ({address}) already listed"
         return jsonify(error=error)
 
+
 @app.get("/property")
 def get_all_properties():
     """handles GET request to read all properties
@@ -192,6 +197,7 @@ def get_all_properties():
 
     return (jsonify(properties=serialized_properties), 200)
 
+
 @app.get("/property/<int:property_id>")
 def get_property(property_id):
     """handles GET request to read specific property based on id
@@ -201,6 +207,7 @@ def get_property(property_id):
 
     property = Property.query.get_or_404(property_id)
     return (jsonify(property=property.serialize()), 200)
+
 
 @app.patch("/property/<int:property_id>")
 @jwt_required()
@@ -220,7 +227,8 @@ def edit_property(property_id):
     property.address = request.form.get("address", property.address)
     property.sqft = request.form.get("sqft", property.sqft)
     property.price_rate = request.form.get("price_rate", property.price_rate)
-    property.description = request.form.get("description", property.description)
+    property.description = request.form.get(
+        "description", property.description)
 
     img_file = request.files.get("file")
 
@@ -235,6 +243,7 @@ def edit_property(property_id):
     except IntegrityError:
         db.session.rollback()
         return jsonify(error=f"Duplicate address: {property.address}")
+
 
 @app.delete("/property/<int:property_id>")
 @jwt_required()
@@ -282,8 +291,8 @@ def book_property(property_id):
 
     try:
         Booking.verify_dates(start_date=start_date,
-                            end_date=end_date,
-                            property_id=property.id)
+                             end_date=end_date,
+                             property_id=property.id)
 
         booking = Booking.add_booking(
             address=property.address,
@@ -299,6 +308,7 @@ def book_property(property_id):
     except MemoryError:
         return jsonify(error="dates are already booked")
 
+
 @app.get("/property/<int:property_id>/bookings")
 @jwt_required()
 def get_property_bookings(property_id):
@@ -312,6 +322,7 @@ def get_property_bookings(property_id):
 
     return jsonify(bookings=[b.serialize() for b in property.bookings])
 
+
 @app.get("/user/<username>/bookings")
 @jwt_required()
 def get_user_bookings(username):
@@ -324,6 +335,7 @@ def get_user_bookings(username):
         return jsonify(error="Invalid Authorization")
 
     return jsonify(bookings=[b.serialize() for b in user.bookings])
+
 
 @app.get("/bookings/<int:booking_id>")
 @jwt_required()
@@ -339,6 +351,7 @@ def get_booking(booking_id):
         return jsonify(error="Invalid Authorization")
 
     return jsonify(booking=booking.serialize())
+
 
 @app.patch("/bookings/<int:booking_id>")
 @jwt_required()
@@ -359,7 +372,8 @@ def update_booking(booking_id):
 
     booking.start_date = datetime.strptime(start_date_str, TIME_FORMAT)
     booking.end_date = datetime.strptime(end_date_str, TIME_FORMAT)
-    booking.total_price = (booking.end_date - booking.start_date).days * property.price_rate
+    booking.total_price = (
+        booking.end_date - booking.start_date).days * property.price_rate
     current_user = get_jwt_identity()
 
     if current_user != booking.customer.username:
@@ -377,6 +391,7 @@ def update_booking(booking_id):
         return jsonify(error="start date is after end date")
     except MemoryError:
         return jsonify(error="dates are already booked")
+
 
 @app.delete("/bookings/<int:booking_id>")
 @jwt_required()
